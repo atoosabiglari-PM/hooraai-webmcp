@@ -2,7 +2,11 @@ import { useState } from 'react'
 import './App.css'
 import { understandHumanInput, type HooraInterpretation } from './hooraLogic'
 import { discoverTalent, type TalentMatch } from './talentMatching'
-import { prepareTask, type PreparedTask } from './taskFlow'
+import {
+  approveTask,
+  prepareTask,
+  type PreparedTask,
+} from './taskFlow'
 import {
   resetHooraSession,
   updateHooraSession,
@@ -118,6 +122,16 @@ function App() {
     const draftTask = prepareTask(submittedInput, nexus.profile)
 
     setPreparedTask(draftTask)
+  }
+
+  function approvePreparedTask() {
+    if (!preparedTask || preparedTask.status !== 'draft') {
+      return
+    }
+
+    const approvedTask = approveTask(preparedTask)
+
+    setPreparedTask(approvedTask)
   }
 
   function editInterpretation() {
@@ -283,7 +297,11 @@ function App() {
 
             {preparedTask && (
               <div className="confirmation-card">
-                <p className="confirmation-label">DRAFT TASK</p>
+                <p className="confirmation-label">
+                  {preparedTask.status === 'draft'
+                    ? 'DRAFT TASK'
+                    : 'APPROVED TASK'}
+                </p>
 
                 <p className="confirmation-text">
                   <strong>{preparedTask.title}</strong>
@@ -299,12 +317,30 @@ function App() {
                 </p>
 
                 <p className="confirmation-note">
-                  Status: Draft
+                  Status:{' '}
+                  {preparedTask.status === 'draft' ? 'Draft' : 'Approved'}
                 </p>
 
-                <p className="confirmation-note">
-                  Human approval is required before this Task can continue.
-                </p>
+                {preparedTask.status === 'draft' ? (
+                  <>
+                    <p className="confirmation-note">
+                      Human approval is required before this Task can continue.
+                    </p>
+
+                    <button
+                      className="continue-button"
+                      type="button"
+                      onClick={approvePreparedTask}
+                    >
+                      ✓ Approve Task
+                    </button>
+                  </>
+                ) : (
+                  <p className="confirmation-note">
+                    ✓ Approved by you. Hoora may now continue to the next
+                    workflow step.
+                  </p>
+                )}
               </div>
             )}
 

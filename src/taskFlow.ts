@@ -1,5 +1,7 @@
 import type { TalentProfile } from './hooraState'
 
+export type TaskStatus = 'draft' | 'approved'
+
 export type PreparedTask = {
   id: string
   title: string
@@ -9,8 +11,9 @@ export type PreparedTask = {
     name: string
     headline: string
   }
-  status: 'draft'
-  humanApprovalRequired: true
+  status: TaskStatus
+  humanApprovalRequired: boolean
+  approvedAt: string | null
 }
 
 export function prepareTask(
@@ -35,5 +38,19 @@ export function prepareTask(
     status: 'draft',
 
     humanApprovalRequired: true,
+
+    approvedAt: null,
+  }
+}
+
+export function approveTask(task: PreparedTask): PreparedTask {
+  return {
+    ...task,
+
+    status: 'approved',
+
+    humanApprovalRequired: false,
+
+    approvedAt: new Date().toISOString(),
   }
 }
