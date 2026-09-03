@@ -1,4 +1,4 @@
-import { getTalentProfiles, type TalentProfile } from './hooraState'
+import { discoverTalent } from './talentMatching'
 
 type WebMCPTool = {
   name: string
@@ -27,66 +27,6 @@ type WebMCPDocument = Document & {
 }
 
 let registrationController: AbortController | null = null
-
-function normalizeWords(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((word) => word.length > 2)
-}
-
-function expandQuery(words: string[]): string[] {
-  const expansions: Record<string, string[]> = {
-    pink: ['color', 'colors', 'creative'],
-    bicycle: ['bike', 'bicycles', 'customization'],
-    bike: ['bicycle', 'customization'],
-    room: ['space', 'home'],
-    house: ['home'],
-    fix: ['problem', 'practical'],
-    food: ['meal', 'meals', 'preparation'],
-    cooking: ['food', 'meal', 'preparation'],
-  }
-
-  const expanded = new Set(words)
-
-  for (const word of words) {
-    const relatedWords = expansions[word] ?? []
-
-    for (const relatedWord of relatedWords) {
-      expanded.add(relatedWord)
-    }
-  }
-
-  return [...expanded]
-}
-
-function scoreTalent(query: string, profile: TalentProfile): number {
-  const queryWords = expandQuery(normalizeWords(query))
-
-  const searchableText = [
-    profile.headline,
-    profile.canDo,
-    profile.location,
-    ...profile.serviceTypes,
-  ]
-    .join(' ')
-    .toLowerCase()
-
-  let score = 0
-
-  for (const word of queryWords) {
-    if (searchableText.includes(word)) {
-      score += 1
-    }
-  }
-
-  if (profile.availableNow) {
-    score += 0.25
-  }
-
-  return score
-}
 
 export async function registerHooraWebMCP() {
   const webDocument = document as WebMCPDocument
@@ -142,12 +82,16 @@ export async function registerHooraWebMCP() {
 
           return {
             success: true,
+
             original_request: request,
+
             interpretation: {
               intent: request,
               status: 'preliminary',
             },
+
             human_confirmation_required: true,
+
             next_step:
               'Show this interpretation to the human and ask them to confirm it before continuing.',
           }
@@ -165,7 +109,7 @@ export async function registerHooraWebMCP() {
         title: 'Discover Human Talent',
 
         description:
-          'Searches HooraAI human talent profiles using a natural-language need, interest, or curiosity. Returns relevant people without requiring the human to choose a predefined job category.',
+          'Searches HooraAI human talent using a natural-language need, interest, or curiosity. The search does not require the human to choose a predefined job category.',
 
         inputSchema: {
           type: 'object',
@@ -196,34 +140,35 @@ export async function registerHooraWebMCP() {
             }
           }
 
-          const matches = getTalentProfiles()
-            .map((profile) => ({
-              profile,
-              relevance: scoreTalent(query, profile),
-            }))
-            .filter((match) => match.relevance > 0)
-            .sort((a, b) => b.relevance - a.relevance)
-            .slice(0, 3)
-            .map((match, index) => ({
-              rank: index + 1,
-              id: match.profile.id,
-              name: match.profile.name,
-              headline: match.profile.headline,
-              can_do: match.profile.canDo,
-              service_types: match.profile.serviceTypes,
-              available_now: match.profile.availableNow,
-              location: match.profile.location,
-            }))
+          const talentMatches = discoverTalent(query)
+
+          const matches = talentMatches.map((match, index) => ({
+            rank: index + 1,
+            id: match.profile.id,
+            name: match.profile.name,
+            headline: match.profile.headline,
+            can_do: match.profile.canDo,
+            service_types: match.profile.serviceTypes,
+            available_now: match.profile.availableNow,
+            location: match.profile.location,
+          }))
 
           return {
             success: true,
+
             query,
+
+            nexus: matches[0] ?? null,
+
             matches,
+
             match_count: matches.length,
+
             human_selection_required: true,
+
             next_step:
               matches.length > 0
-                ? 'Present these talent matches to the human. Do not select a person or create a Task without human approval.'
+                ? 'Present the Nexus and other relevant talent to the human. Do not select a Professional or create a Task without human approval.'
                 : 'No strong talent match was found. Ask the human for more detail rather than guessing.',
           }
         },
