@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import { understandHumanInput, type HooraInterpretation } from './hooraLogic'
 import { discoverTalent, type TalentMatch } from './talentMatching'
+import { prepareTask, type PreparedTask } from './taskFlow'
 import {
   resetHooraSession,
   updateHooraSession,
@@ -48,6 +49,7 @@ function App() {
     useState<HooraInterpretation | null>(null)
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [matches, setMatches] = useState<TalentMatch[]>([])
+  const [preparedTask, setPreparedTask] = useState<PreparedTask | null>(null)
 
   function chooseMode(selectedMode: ActiveMode) {
     setMode(selectedMode)
@@ -56,6 +58,7 @@ function App() {
     setInterpretation(null)
     setIsConfirmed(false)
     setMatches([])
+    setPreparedTask(null)
 
     updateHooraSession({
       mode: selectedMode,
@@ -82,6 +85,7 @@ function App() {
     setHumanInput('')
     setIsConfirmed(false)
     setMatches([])
+    setPreparedTask(null)
 
     updateHooraSession({
       humanInput: cleanedInput,
@@ -91,6 +95,7 @@ function App() {
 
   function confirmInterpretation() {
     setIsConfirmed(true)
+    setPreparedTask(null)
 
     updateHooraSession({
       humanInput: submittedInput,
@@ -103,12 +108,25 @@ function App() {
     }
   }
 
+  function createDraftTask() {
+    const nexus = matches[0]
+
+    if (!nexus) {
+      return
+    }
+
+    const draftTask = prepareTask(submittedInput, nexus.profile)
+
+    setPreparedTask(draftTask)
+  }
+
   function editInterpretation() {
     setHumanInput(submittedInput)
     setSubmittedInput('')
     setInterpretation(null)
     setIsConfirmed(false)
     setMatches([])
+    setPreparedTask(null)
 
     updateHooraSession({
       humanInput: '',
@@ -123,6 +141,7 @@ function App() {
     setInterpretation(null)
     setIsConfirmed(false)
     setMatches([])
+    setPreparedTask(null)
 
     resetHooraSession()
   }
@@ -249,8 +268,45 @@ function App() {
                       ? 'Available now'
                       : 'Available by booking'}
                   </p>
+
+                  {!preparedTask && (
+                    <button
+                      className="continue-button"
+                      type="button"
+                      onClick={createDraftTask}
+                    >
+                      Prepare Task
+                    </button>
+                  )}
                 </div>
               )}
+
+            {preparedTask && (
+              <div className="confirmation-card">
+                <p className="confirmation-label">DRAFT TASK</p>
+
+                <p className="confirmation-text">
+                  <strong>{preparedTask.title}</strong>
+                </p>
+
+                <p className="confirmation-note">
+                  Request: {preparedTask.request}
+                </p>
+
+                <p className="confirmation-note">
+                  Nexus: {preparedTask.nexus.name} ·{' '}
+                  {preparedTask.nexus.headline}
+                </p>
+
+                <p className="confirmation-note">
+                  Status: Draft
+                </p>
+
+                <p className="confirmation-note">
+                  Human approval is required before this Task can continue.
+                </p>
+              </div>
+            )}
 
             {isConfirmed &&
               (mode === 'need' || mode === 'surprise') &&
@@ -290,9 +346,7 @@ function App() {
               onClick={() => chooseMode('need')}
             >
               <span className="sparkle">✨</span>
-
               <span className="choice-title">I need something</span>
-
               <span className="choice-description">
                 Tell Hoora what you need.
               </span>
@@ -304,9 +358,7 @@ function App() {
               onClick={() => chooseMode('talent')}
             >
               <span className="sparkle">✨</span>
-
               <span className="choice-title">I can do something</span>
-
               <span className="choice-description">
                 Show Hoora what you can do.
               </span>
@@ -318,9 +370,7 @@ function App() {
               onClick={() => chooseMode('surprise')}
             >
               <span className="sparkle">✨</span>
-
               <span className="choice-title">Surprise me</span>
-
               <span className="choice-description">
                 Tell Hoora what you like.
               </span>

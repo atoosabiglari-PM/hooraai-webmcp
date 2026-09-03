@@ -1,4 +1,6 @@
+import { getTalentProfiles } from './hooraState'
 import { discoverTalent } from './talentMatching'
+import { prepareTask } from './taskFlow'
 
 type WebMCPTool = {
   name: string
@@ -178,8 +180,101 @@ export async function registerHooraWebMCP() {
       },
     )
 
+    await webDocument.modelContext.registerTool(
+      {
+        name: 'prepare_task',
+
+        title: 'Prepare a Hoora Task',
+
+        description:
+          'Prepares a draft HooraAI Task connecting a human request with a selected Nexus. This tool does not approve, book, assign, charge, pay, or start the Task. Final human approval is required.',
+
+        inputSchema: {
+          type: 'object',
+          properties: {
+            request: {
+              type: 'string',
+              description:
+                'The human-confirmed request that the draft Task should address.',
+            },
+
+            talent_id: {
+              type: 'string',
+              description:
+                'The HooraAI talent profile ID selected as the proposed Nexus.',
+            },
+          },
+          required: ['request', 'talent_id'],
+          additionalProperties: false,
+        },
+
+        annotations: {
+          readOnlyHint: true,
+          untrustedContentHint: false,
+        },
+
+        execute: async (input) => {
+          const request =
+            typeof input.request === 'string' ? input.request.trim() : ''
+
+          const talentId =
+            typeof input.talent_id === 'string'
+              ? input.talent_id.trim()
+              : ''
+
+          if (!request) {
+            return {
+              success: false,
+              message: 'A human-confirmed request is required.',
+            }
+          }
+
+          if (!talentId) {
+            return {
+              success: false,
+              message: 'A selected talent ID is required.',
+            }
+          }
+
+          const talent = getTalentProfiles().find(
+            (profile) => profile.id === talentId,
+          )
+
+          if (!talent) {
+            return {
+              success: false,
+              message: 'The selected HooraAI talent profile was not found.',
+            }
+          }
+
+          const draftTask = prepareTask(request, talent)
+
+          return {
+            success: true,
+
+            task: draftTask,
+
+            human_approval_required: true,
+
+            prohibited_without_human_approval: [
+              'booking',
+              'professional assignment',
+              'payment',
+              'starting the task',
+            ],
+
+            next_step:
+              'Present this draft Task to the human for review and explicit approval. Do not continue automatically.',
+          }
+        },
+      },
+      {
+        signal: registrationController.signal,
+      },
+    )
+
     console.info(
-      'HooraAI WebMCP: understand_need and discover_talent registered.',
+      'HooraAI WebMCP: understand_need, discover_talent, and prepare_task registered.',
     )
   } catch (error) {
     console.error('HooraAI WebMCP registration failed:', error)
