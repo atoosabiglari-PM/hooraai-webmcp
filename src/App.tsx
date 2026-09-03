@@ -1,5 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
+import {
+  clearAgentPreparedTask,
+  getAgentPreparedTask,
+  HOORA_AGENT_TASK_EVENT,
+} from './agentBridge'
 import { understandHumanInput, type HooraInterpretation } from './hooraLogic'
 import { discoverTalent, type TalentMatch } from './talentMatching'
 import {
@@ -54,6 +59,35 @@ function App() {
   const [isConfirmed, setIsConfirmed] = useState(false)
   const [matches, setMatches] = useState<TalentMatch[]>([])
   const [preparedTask, setPreparedTask] = useState<PreparedTask | null>(null)
+
+  const [agentPreparedTask, setAgentPreparedTask] =
+    useState<PreparedTask | null>(null)
+
+  useEffect(() => {
+    const existingAgentTask = getAgentPreparedTask()
+
+    if (existingAgentTask) {
+      setAgentPreparedTask(existingAgentTask)
+    }
+
+    function handleAgentPreparedTask(event: Event) {
+      const customEvent = event as CustomEvent<PreparedTask>
+
+      setAgentPreparedTask(customEvent.detail)
+    }
+
+    window.addEventListener(
+      HOORA_AGENT_TASK_EVENT,
+      handleAgentPreparedTask,
+    )
+
+    return () => {
+      window.removeEventListener(
+        HOORA_AGENT_TASK_EVENT,
+        handleAgentPreparedTask,
+      )
+    }
+  }, [])
 
   function chooseMode(selectedMode: ActiveMode) {
     setMode(selectedMode)
@@ -134,6 +168,20 @@ function App() {
     setPreparedTask(approvedTask)
   }
 
+  function approveAgentPreparedTask() {
+    if (
+      !agentPreparedTask ||
+      agentPreparedTask.status !== 'draft'
+    ) {
+      return
+    }
+
+    const approvedTask = approveTask(agentPreparedTask)
+
+    setAgentPreparedTask(approvedTask)
+    clearAgentPreparedTask()
+  }
+
   function editInterpretation() {
     setHumanInput(submittedInput)
     setSubmittedInput('')
@@ -160,6 +208,68 @@ function App() {
     resetHooraSession()
   }
 
+  function renderAgentTask() {
+    if (!agentPreparedTask) {
+      return null
+    }
+
+    return (
+      <div className="confirmation-card">
+        <p className="confirmation-label">
+          {agentPreparedTask.status === 'draft'
+            ? 'AGENT-PREPARED TASK'
+            : 'APPROVED AGENT TASK'}
+        </p>
+
+        <p className="confirmation-text">
+          <strong>{agentPreparedTask.title}</strong>
+        </p>
+
+        <p className="confirmation-note">
+          Request: {agentPreparedTask.request}
+        </p>
+
+        <p className="confirmation-note">
+          Nexus: {agentPreparedTask.nexus.name} ·{' '}
+          {agentPreparedTask.nexus.headline}
+        </p>
+
+        <p className="confirmation-note">
+          Status:{' '}
+          {agentPreparedTask.status === 'draft'
+            ? 'Draft'
+            : 'Approved'}
+        </p>
+
+        {agentPreparedTask.status === 'draft' ? (
+          <>
+            <p className="confirmation-note">
+              An AI agent prepared this Task for you. Nothing has been
+              booked, assigned, charged, or started.
+            </p>
+
+            <p className="confirmation-note">
+              Your approval is required before Hoora can continue.
+            </p>
+
+            <button
+              className="continue-button"
+              type="button"
+              onClick={approveAgentPreparedTask}
+            >
+              ✓ Approve Agent-Prepared Task
+            </button>
+          </>
+        ) : (
+          <p className="confirmation-note">
+            ✓ Approved by you. The agent may now continue to the next
+            permitted workflow step.
+          </p>
+        )}
+      </div>
+    )
+  }
+
   if (mode) {
     const content = modeContent[mode]
     const nexus = matches[0]
@@ -170,7 +280,11 @@ function App() {
           <div className="brand">HooraAI</div>
 
           <div className="hero-content">
-            <button className="back-button" type="button" onClick={goBack}>
+            <button
+              className="back-button"
+              type="button"
+              onClick={goBack}
+            >
               ← Back
             </button>
 
@@ -178,20 +292,37 @@ function App() {
 
             <h1>{content.title}</h1>
 
-            <p className="mode-description">{content.description}</p>
+            <p className="mode-description">
+              {content.description}
+            </p>
+
+            {renderAgentTask()}
 
             <div className="input-panel">
               <div className="input-methods">
-                <span className="input-method active-method">⌨ Type</span>
-                <span className="input-method">🎙 Voice</span>
-                <span className="input-method">📷 Photo</span>
-                <span className="input-method">🎥 Video</span>
+                <span className="input-method active-method">
+                  ⌨ Type
+                </span>
+
+                <span className="input-method">
+                  🎙 Voice
+                </span>
+
+                <span className="input-method">
+                  📷 Photo
+                </span>
+
+                <span className="input-method">
+                  🎥 Video
+                </span>
               </div>
 
               <textarea
                 className="hoora-input"
                 value={humanInput}
-                onChange={(event) => handleInputChange(event.target.value)}
+                onChange={(event) =>
+                  handleInputChange(event.target.value)
+                }
                 placeholder={content.placeholder}
                 rows={6}
               />
@@ -208,13 +339,21 @@ function App() {
 
             {interpretation && (
               <div className="confirmation-card">
-                <p className="confirmation-label">YOU SAID</p>
+                <p className="confirmation-label">
+                  YOU SAID
+                </p>
 
-                <p className="confirmation-text">{submittedInput}</p>
+                <p className="confirmation-text">
+                  {submittedInput}
+                </p>
 
-                <p className="confirmation-label">HOORA UNDERSTANDS</p>
+                <p className="confirmation-label">
+                  HOORA UNDERSTANDS
+                </p>
 
-                <p className="confirmation-text">{interpretation.summary}</p>
+                <p className="confirmation-text">
+                  {interpretation.summary}
+                </p>
 
                 {!isConfirmed ? (
                   <>
@@ -248,7 +387,9 @@ function App() {
 
             {isConfirmed && mode === 'talent' && (
               <div className="confirmation-card">
-                <p className="confirmation-label">YOUR TALENT</p>
+                <p className="confirmation-label">
+                  YOUR TALENT
+                </p>
 
                 <p className="confirmation-text">
                   Hoora can now make this talent understandable and
@@ -261,10 +402,13 @@ function App() {
               (mode === 'need' || mode === 'surprise') &&
               nexus && (
                 <div className="confirmation-card">
-                  <p className="confirmation-label">YOUR NEXUS</p>
+                  <p className="confirmation-label">
+                    YOUR NEXUS
+                  </p>
 
                   <p className="confirmation-text">
-                    Your Nexus is <strong>{nexus.profile.name}</strong>.
+                    Your Nexus is{' '}
+                    <strong>{nexus.profile.name}</strong>.
                   </p>
 
                   <p className="confirmation-text">
@@ -318,13 +462,16 @@ function App() {
 
                 <p className="confirmation-note">
                   Status:{' '}
-                  {preparedTask.status === 'draft' ? 'Draft' : 'Approved'}
+                  {preparedTask.status === 'draft'
+                    ? 'Draft'
+                    : 'Approved'}
                 </p>
 
                 {preparedTask.status === 'draft' ? (
                   <>
                     <p className="confirmation-note">
-                      Human approval is required before this Task can continue.
+                      Human approval is required before this Task can
+                      continue.
                     </p>
 
                     <button
@@ -337,8 +484,8 @@ function App() {
                   </>
                 ) : (
                   <p className="confirmation-note">
-                    ✓ Approved by you. Hoora may now continue to the next
-                    workflow step.
+                    ✓ Approved by you. Hoora may now continue to the
+                    next workflow step.
                   </p>
                 )}
               </div>
@@ -348,7 +495,9 @@ function App() {
               (mode === 'need' || mode === 'surprise') &&
               matches.length === 0 && (
                 <div className="confirmation-card">
-                  <p className="confirmation-label">HOORA</p>
+                  <p className="confirmation-label">
+                    HOORA
+                  </p>
 
                   <p className="confirmation-text">
                     I don&apos;t have a strong Nexus yet.
@@ -371,9 +520,15 @@ function App() {
         <div className="brand">HooraAI</div>
 
         <div className="hero-content">
-          <p className="eyebrow">HUMAN TALENT × AI</p>
+          <p className="eyebrow">
+            HUMAN TALENT × AI
+          </p>
 
-          <h1>What brings you to Hoora right now?</h1>
+          <h1>
+            What brings you to Hoora right now?
+          </h1>
+
+          {renderAgentTask()}
 
           <div className="choices">
             <button
@@ -382,7 +537,11 @@ function App() {
               onClick={() => chooseMode('need')}
             >
               <span className="sparkle">✨</span>
-              <span className="choice-title">I need something</span>
+
+              <span className="choice-title">
+                I need something
+              </span>
+
               <span className="choice-description">
                 Tell Hoora what you need.
               </span>
@@ -394,7 +553,11 @@ function App() {
               onClick={() => chooseMode('talent')}
             >
               <span className="sparkle">✨</span>
-              <span className="choice-title">I can do something</span>
+
+              <span className="choice-title">
+                I can do something
+              </span>
+
               <span className="choice-description">
                 Show Hoora what you can do.
               </span>
@@ -406,7 +569,11 @@ function App() {
               onClick={() => chooseMode('surprise')}
             >
               <span className="sparkle">✨</span>
-              <span className="choice-title">Surprise me</span>
+
+              <span className="choice-title">
+                Surprise me
+              </span>
+
               <span className="choice-description">
                 Tell Hoora what you like.
               </span>

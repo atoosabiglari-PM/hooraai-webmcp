@@ -1,3 +1,4 @@
+import { publishAgentPreparedTask } from './agentBridge'
 import { getTalentProfiles } from './hooraState'
 import { discoverTalent } from './talentMatching'
 import { prepareTask } from './taskFlow'
@@ -187,7 +188,7 @@ export async function registerHooraWebMCP() {
         title: 'Prepare a Hoora Task',
 
         description:
-          'Prepares a draft HooraAI Task connecting a human request with a selected Nexus. This tool does not approve, book, assign, charge, pay, or start the Task. Final human approval is required.',
+          'Prepares a draft HooraAI Task connecting a human-confirmed request with a selected Nexus and publishes that draft into the HooraAI human interface for review. It does not approve, book, assign, charge, pay, or start the Task.',
 
         inputSchema: {
           type: 'object',
@@ -209,7 +210,7 @@ export async function registerHooraWebMCP() {
         },
 
         annotations: {
-          readOnlyHint: true,
+          readOnlyHint: false,
           untrustedContentHint: false,
         },
 
@@ -249,10 +250,14 @@ export async function registerHooraWebMCP() {
 
           const draftTask = prepareTask(request, talent)
 
+          publishAgentPreparedTask(draftTask)
+
           return {
             success: true,
 
             task: draftTask,
+
+            published_to_human_interface: true,
 
             human_approval_required: true,
 
@@ -264,7 +269,7 @@ export async function registerHooraWebMCP() {
             ],
 
             next_step:
-              'Present this draft Task to the human for review and explicit approval. Do not continue automatically.',
+              'The draft Task is now available in the HooraAI human interface. The human must review and explicitly approve it before anything continues.',
           }
         },
       },
