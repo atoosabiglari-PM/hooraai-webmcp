@@ -32,7 +32,8 @@ const modeContent: Record<
     title: 'Tell Hoora what you need.',
     description:
       'Describe it naturally. You do not need to know the job title or category.',
-    placeholder: 'For example: I need help making this room feel warmer...',
+    placeholder:
+      'For example: I need someone to help me find my first love... or I need to fix my fridge...',
   },
 
   talent: {
